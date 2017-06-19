@@ -121,7 +121,7 @@ namespace mongo {
           if (_tsiter != _tsmap.end()) {
             auto tsval = *_tsiter;
             ts_key_type keyts = tsval.first;
-            if (_tscomp(_timestamp, keyts.second) || !(*_tsiter).second) {
+            if (_tscomp(_timestamp, keyts.second) || !_tsiter->second) {
               next(false);
             }
           }
@@ -153,18 +153,18 @@ namespace mongo {
         next(bool positioned) {
           boost::optional<key_type> current_key;
           if (positioned)
-            current_key = (*_tsiter).first.first;
+            current_key = _tsiter->first.first;
 
           while (++_tsiter != _tsmap.end()) {
-            ts_key_type keyts = (*_tsiter).first;
+            ts_key_type keyts = _tsiter->first;
             // Skip invisible values
             if (_tscomp(_timestamp, keyts.second))
               continue;
             // Don't return tombstones (or any other version of this record)
-            if (!(*_tsiter).second)
+            if (!_tsiter->second)
               current_key = keyts.first;
             // Stop when we see a new key
-            if (!current_key || (*_tsiter).first.first != *current_key)
+            if (!current_key || _tsiter->first.first != *current_key)
               break;
           }
         }
@@ -266,7 +266,7 @@ namespace mongo {
 
       iterator insert(iterator __position, const value_type& __x) {
         // XXX detect write-write conflicts?  We have __position._timestamp...
-        this[(*__position).first] = __x;
+        this[__position->first] = __x;
         return __position;
       }
 
@@ -281,21 +281,21 @@ namespace mongo {
         // version with the correct timestamp for modifications
         //
         // __i->first is greater than or equivalent to __k.
-        if (__i == _tsmap.end() || _keycomp((*__i).first.first, __k) || !(*__i).second)
+        if (__i == _tsmap.end() || _keycomp(__i->first.first, __k) || !__i->second)
           __i = _tsmap.insert(__i, ts_value_type(keyts, mapped_type()));
         else {
           // We're overwriting something, save the old (key, timestamp)
           _obsmap.emplace(_current, __i->first);
-          __i = _tsmap.insert(__i, ts_value_type(keyts, *(*__i).second));
+          __i = _tsmap.insert(__i, ts_value_type(keyts, *__i->second));
         }
-        return *(*__i).second;
+        return *__i->second;
       }
 
       void erase(const key_type& __k) {
         clean(kCleansPerUpdate);
         ts_key_type keyts(__k, _current);
         ts_iterator __i = _tsmap.lower_bound(keyts);
-        if (__i == _tsmap.end() || _keycomp((*__i).first.first, __k) || !(*__i).second)
+        if (__i == _tsmap.end() || _keycomp(__i->first.first, __k) || !__i->second)
           return; // nothing to do -- should this throw?
         // We're overwriting something, save the old (key, timestamp)
         _obsmap.emplace(_current, __i->first);
@@ -311,14 +311,14 @@ namespace mongo {
         clean(kCleansPerUpdate);
         ts_key_type keyts = std::make_pair(__k, _current);
         ts_iterator __i = _tsmap.lower_bound(keyts);
-        if (__i == _tsmap.end() || _keycomp((*__i).first.first, __k) || !(*__i).second)
+        if (__i == _tsmap.end() || _keycomp(__i->first.first, __k) || !__i->second)
           throw std::out_of_range("multiversion_map::at");
         else {
           // We're overwriting something, save the old (key, timestamp)
           _obsmap.emplace(_current, __i->first);
-          __i = _tsmap.insert(__i, ts_value_type(keyts, *(*__i).second));
+          __i = _tsmap.insert(__i, ts_value_type(keyts, *__i->second));
         }
-        return *(*__i).second;
+        return *__i->second;
       }
 
       const mapped_type&
@@ -327,9 +327,9 @@ namespace mongo {
         // needs a const version of lower_bound
         ts_key_type keyts = std::make_pair(__k, _current);
         const_ts_iterator __i = _tsmap.lower_bound(keyts);
-        if (__i == _tsmap.end() || _keycomp((*__i).first.first, __k) || !(*__i).second)
+        if (__i == _tsmap.end() || _keycomp(__i->first.first, __k) || !__i->second)
           throw std::out_of_range("multiversion_map::at");
-        return *(*__i).second;
+        return *__i->second;
       }
   };
 
